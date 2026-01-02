@@ -1,3 +1,4 @@
+/* styles.css */
 :root{
   --bg:#0f1115;
   --panel:#161a22;
@@ -53,12 +54,20 @@ button{
   background: transparent;
   color: var(--text);
   border: 1px solid var(--border);
-  padding: 10px 12px;
+  padding: 12px 14px;
   border-radius: 12px;
   cursor: pointer;
+  touch-action: manipulation;
 }
 button:hover{ border-color: rgba(255,255,255,0.2); }
 button:active{ transform: translateY(1px); }
+
+button.danger{
+  border-color: rgba(255,107,107,0.35);
+}
+button.danger:hover{
+  border-color: rgba(255,107,107,0.7);
+}
 
 .panel{
   padding: 14px;
@@ -111,7 +120,7 @@ button:active{ transform: translateY(1px); }
   margin-right: 8px;
 }
 
-
+/* Save Manager */
 .savePanel{
   margin-top: 12px;
   padding-top: 12px;
@@ -142,18 +151,17 @@ button:active{ transform: translateY(1px); }
   outline: none;
 }
 
+.saveActions{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+}
+
 .saveHint{
   margin: 0;
   color: var(--muted);
   font-size: 12px;
   line-height: 1.4;
-}
-
-button.danger{
-  border-color: rgba(255,107,107,0.35);
-}
-button.danger:hover{
-  border-color: rgba(255,107,107,0.7);
 }
 
 /* Mobile tweaks */
@@ -166,8 +174,5 @@ button.danger:hover{
   }
   .toolbar{
     flex-wrap: wrap;
-  }
-  button{
-    padding: 12px 14px;
   }
 }
