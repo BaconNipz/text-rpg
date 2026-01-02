@@ -1,3 +1,4 @@
+<!-- index.html -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -10,38 +11,44 @@
   <main class="wrap">
     <header class="top">
       <h1>Text RPG</h1>
+
       <div class="hud" id="hud"></div>
+
       <div class="toolbar">
-        <button id="btnSave" type="button">Save</button>
-        <button id="btnLoad" type="button">Load</button>
         <button id="btnNew" type="button">New Game</button>
       </div>
-<section class="savePanel">
-  <div class="saveRow">
-    <label class="saveLabel" for="saveName">Save name</label>
-    <input id="saveName" class="saveInput" type="text" placeholder="e.g., Ridge run / Mage / Attempt 3" />
-    <button id="btnSaveNew" type="button">Save New</button>
-  </div>
 
-  <div class="saveRow">
-    <label class="saveLabel" for="saveSelect">Saves</label>
-    <select id="saveSelect" class="saveSelect"></select>
-    <button id="btnSaveOverwrite" type="button">Overwrite</button>
-    <button id="btnLoadSelected" type="button">Load</button>
-    <button id="btnDeleteSelected" type="button" class="danger">Delete</button>
-  </div>
+      <!-- Phone-friendly Save Manager -->
+      <section class="savePanel">
+        <div class="saveRow">
+          <label class="saveLabel" for="saveName">Save name</label>
+          <input id="saveName" class="saveInput" type="text" placeholder="e.g., Ridge run / Attempt 3" />
+          <button id="btnSaveNew" type="button">Save New</button>
+        </div>
 
-  <p class="saveHint" id="saveHint"></p>
-</section>
+        <div class="saveRow">
+          <label class="saveLabel" for="saveSelect">Saves</label>
+          <select id="saveSelect" class="saveSelect"></select>
+          <button id="btnQuickSave" type="button">Quick Save</button>
+        </div>
 
-      
+        <div class="saveRow">
+          <label class="saveLabel" for="btnLoadSelected">Actions</label>
+          <div class="saveActions">
+            <button id="btnLoadSelected" type="button">Load</button>
+            <button id="btnDeleteSelected" type="button" class="danger">Delete</button>
+          </div>
+          <span></span>
+        </div>
+
+        <p class="saveHint" id="saveHint"></p>
+      </section>
     </header>
 
-    <!-- Description ABOVE buttons (your preferred layout) -->
+    <!-- Description ABOVE buttons -->
     <section class="panel">
       <h2 id="locTitle">...</h2>
       <p id="locDesc" class="desc">...</p>
-
       <div id="choices" class="choices"></div>
     </section>
 
