@@ -1,20 +1,32 @@
 // game.js
 
-const STORAGE_KEY = "textRpgSave_v1";
+// Multi-save storage keys
+const STORAGE_INDEX_KEY = "textRpgSavesIndex_v1";
+const STORAGE_SAVE_PREFIX = "textRpgSave_v1__";
 
+// Game state
 const state = {
   time: 0,
   locationId: WORLD.startLocationId,
   hp: 10,
   stamina: 6,
   hunger: 0,
-  inventory: {},      // { itemId: count }
-  flags: {},          // { someFlag: true }
+  inventory: {},
+  flags: {},
   log: []
 };
 
+// ---------- Helpers ----------
 function randInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function makeId() {
+  return Math.random().toString(16).slice(2) + "-" + Date.now().toString(16);
 }
 
 function addItem(id, qty = 1) {
@@ -35,6 +47,12 @@ function spendItems(req) {
   }
 }
 
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, s => ({
+    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+  }[s]));
+}
+
 function logLine(text, tag = "") {
   const entry = { text, tag, t: Date.now() };
   state.log.unshift(entry);
@@ -42,20 +60,18 @@ function logLine(text, tag = "") {
   renderLog();
 }
 
+// ---------- Core Loop ----------
 function tick() {
   state.time += 1;
   state.hunger += 1;
 
-  // Tiny pressure system
   if (state.hunger >= 6) {
     state.hp = Math.max(0, state.hp - 1);
     logLine("Hunger gnaws. You lose 1 HP.", "Status");
-    state.hunger = 5; // cap it so it does not spiral instantly
+    state.hunger = 5;
   }
 
-  // Stamina recovers slowly if you are not sprinting around
   state.stamina = Math.min(6, state.stamina + 1);
-
   renderHud();
 }
 
@@ -77,6 +93,7 @@ function describeInventory() {
     .join(", ");
 }
 
+// ---------- Render ----------
 function renderHud() {
   const hud = document.getElementById("hud");
   hud.innerHTML = `
@@ -99,12 +116,6 @@ function renderLog() {
   }
 }
 
-function escapeHtml(str) {
-  return str.replace(/[&<>"']/g, s => ({
-    "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
-  }[s]));
-}
-
 function makeChoiceButton(label, onClick, className = "choiceBtn") {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -122,7 +133,7 @@ function renderLocation() {
   const choices = document.getElementById("choices");
   choices.innerHTML = "";
 
-  // Movement buttons
+  // Movement
   for (const [label, dest] of Object.entries(loc.exits || {})) {
     choices.appendChild(
       makeChoiceButton(`Go: ${label}`, () => {
@@ -137,19 +148,16 @@ function renderLocation() {
     );
   }
 
-  // Action buttons
+  // Actions
   (loc.actions || []).forEach(actionId => {
-    const label = actionLabel(actionId);
-    choices.appendChild(
-      makeChoiceButton(label, () => doAction(actionId))
-    );
+    choices.appendChild(makeChoiceButton(actionLabel(actionId), () => doAction(actionId)));
   });
 
   // Always available
   choices.appendChild(
     makeChoiceButton("Check inventory", () => {
       logLine(`Inventory: ${describeInventory()}`, "Inventory");
-    }, "choiceBtn")
+    })
   );
 }
 
@@ -159,13 +167,12 @@ function actionLabel(id) {
     rest: "Rest",
     craft: "Craft",
     scout: "Scout ahead",
-    move: "Look for a way through",
-    talk: "Talk",
-    trade: "Trade"
+    talk: "Talk"
   };
   return map[id] || id;
 }
 
+// ---------- Actions ----------
 function doAction(actionId) {
   const loc = currentLoc();
 
@@ -199,13 +206,13 @@ function doAction(actionId) {
   }
 
   if (actionId === "craft") {
-    // Show craft options as new buttons in the choices area (simple modal-less approach)
     const choices = document.getElementById("choices");
     logLine("You consider what you can make...", "Craft");
 
     WORLD.recipes.forEach(r => {
       const can = hasItems(r.requires);
       const label = can ? `Craft: ${r.name}` : `Craft: ${r.name} (missing items)`;
+
       const btn = makeChoiceButton(label, () => {
         if (!hasItems(r.requires)) {
           logLine("You lack the materials.", "Craft");
@@ -217,6 +224,7 @@ function doAction(actionId) {
         tick();
         renderHud();
       });
+
       if (!can) btn.style.opacity = "0.6";
       choices.appendChild(btn);
     });
@@ -249,34 +257,159 @@ function doAction(actionId) {
     return;
   }
 
-  if (actionId === "trade") {
-    logLine("Trading is not implemented yet. Your wallet laughs quietly.", "Trade");
-    tick();
-    return;
-  }
-
   logLine(`That action (${actionId}) is not implemented yet.`, "Debug");
 }
 
-function saveGame() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  logLine("Game saved.", "System");
+// ---------- Multi-save system ----------
+function getSavesIndex() {
+  const raw = localStorage.getItem(STORAGE_INDEX_KEY);
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return []; }
 }
 
-function loadGame() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    logLine("No save found.", "System");
+function setSavesIndex(index) {
+  localStorage.setItem(STORAGE_INDEX_KEY, JSON.stringify(index));
+}
+
+function summarizeStateForIndex(label, id, createdAt, updatedAt) {
+  const loc = WORLD.locations[state.locationId];
+  return {
+    id,
+    label: label || "Unnamed run",
+    createdAt,
+    updatedAt,
+    locationId: state.locationId,
+    locationTitle: loc?.title || state.locationId,
+    hp: state.hp,
+    stamina: state.stamina,
+    hunger: state.hunger,
+    time: state.time
+  };
+}
+
+function saveNew(label) {
+  const index = getSavesIndex();
+  const id = makeId();
+  const createdAt = nowIso();
+  const updatedAt = createdAt;
+
+  localStorage.setItem(STORAGE_SAVE_PREFIX + id, JSON.stringify(state));
+  index.unshift(summarizeStateForIndex(label, id, createdAt, updatedAt));
+  setSavesIndex(index);
+
+  logLine(`Saved new run: "${label || "Unnamed run"}".`, "System");
+  refreshSaveUI(id);
+}
+
+function overwriteSave(id, labelMaybe) {
+  if (!id) {
+    logLine("No save selected to overwrite.", "System");
     return;
   }
-  const loaded = JSON.parse(raw);
-  Object.assign(state, loaded);
-  logLine("Game loaded.", "System");
-  renderAll();
+  const index = getSavesIndex();
+  const entry = index.find(s => s.id === id);
+  if (!entry) {
+    logLine("Selected save not found.", "System");
+    return;
+  }
+
+  localStorage.setItem(STORAGE_SAVE_PREFIX + id, JSON.stringify(state));
+
+  const updatedAt = nowIso();
+  const label = (labelMaybe && labelMaybe.trim()) ? labelMaybe.trim() : entry.label;
+  const updated = summarizeStateForIndex(label, id, entry.createdAt, updatedAt);
+
+  const newIndex = index.map(s => (s.id === id ? updated : s));
+  setSavesIndex(newIndex);
+
+  logLine(`Quick saved: "${updated.label}".`, "System");
+  refreshSaveUI(id);
 }
 
+function loadSave(id) {
+  if (!id) {
+    logLine("No save selected to load.", "System");
+    return;
+  }
+  const raw = localStorage.getItem(STORAGE_SAVE_PREFIX + id);
+  if (!raw) {
+    logLine("That save file is missing.", "System");
+    return;
+  }
+
+  let loaded;
+  try { loaded = JSON.parse(raw); } catch {
+    logLine("Save data was corrupted.", "System");
+    return;
+  }
+
+  Object.assign(state, loaded);
+  logLine("Loaded save.", "System");
+  renderAll();
+  refreshSaveUI(id);
+}
+
+function deleteSave(id) {
+  if (!id) {
+    logLine("No save selected to delete.", "System");
+    return;
+  }
+  localStorage.removeItem(STORAGE_SAVE_PREFIX + id);
+
+  const index = getSavesIndex().filter(s => s.id !== id);
+  setSavesIndex(index);
+
+  logLine("Deleted save.", "System");
+  refreshSaveUI(index[0]?.id || null);
+}
+
+function formatSaveOption(s) {
+  const dt = new Date(s.updatedAt);
+  const when = isNaN(dt.getTime()) ? "unknown date" : dt.toLocaleString();
+  return `${s.label} | ${when} | ${s.locationTitle} | t:${s.time} HP:${s.hp}`;
+}
+
+function refreshSaveUI(selectId = null) {
+  const select = document.getElementById("saveSelect");
+  const hint = document.getElementById("saveHint");
+  if (!select) return;
+
+  const index = getSavesIndex();
+  select.innerHTML = "";
+
+  if (index.length === 0) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No saves yet";
+    select.appendChild(opt);
+    if (hint) hint.textContent = "Tip: Type a name then tap “Save New”.";
+    return;
+  }
+
+  for (const s of index) {
+    const opt = document.createElement("option");
+    opt.value = s.id;
+    opt.textContent = formatSaveOption(s);
+    select.appendChild(opt);
+  }
+
+  const chosen = selectId || select.value || index[0].id;
+  select.value = chosen;
+
+  const selected = index.find(s => s.id === chosen);
+  if (hint) {
+    if (selected) {
+      const created = new Date(selected.createdAt);
+      const cStr = isNaN(created.getTime()) ? "unknown" : created.toLocaleString();
+      hint.textContent = `Selected: "${selected.label}" (created ${cStr}).`;
+    } else {
+      hint.textContent = "";
+    }
+  }
+}
+
+// ---------- New Game + Wiring ----------
 function newGame() {
-  // Reset to defaults
   state.time = 0;
   state.locationId = WORLD.startLocationId;
   state.hp = 10;
@@ -287,6 +420,7 @@ function newGame() {
   state.log = [];
   logLine("New game started.", "System");
   renderAll();
+  refreshSaveUI(document.getElementById("saveSelect")?.value || null);
 }
 
 function renderAll() {
@@ -296,13 +430,42 @@ function renderAll() {
 }
 
 function wireUi() {
-  document.getElementById("btnSave").addEventListener("click", saveGame);
-  document.getElementById("btnLoad").addEventListener("click", loadGame);
   document.getElementById("btnNew").addEventListener("click", newGame);
+
+  const saveName = document.getElementById("saveName");
+  const saveSelect = document.getElementById("saveSelect");
+
+  document.getElementById("btnSaveNew").addEventListener("click", () => {
+    const label = (saveName.value || "").trim();
+    saveNew(label);
+    saveName.value = "";
+  });
+
+  document.getElementById("btnQuickSave").addEventListener("click", () => {
+    overwriteSave(saveSelect.value, "");
+  });
+
+  document.getElementById("btnLoadSelected").addEventListener("click", () => {
+    loadSave(saveSelect.value);
+  });
+
+  document.getElementById("btnDeleteSelected").addEventListener("click", () => {
+    const id = saveSelect.value;
+    const index = getSavesIndex();
+    const entry = index.find(s => s.id === id);
+    const name = entry?.label || "this save";
+    if (confirm(`Delete "${name}"? This cannot be undone.`)) {
+      deleteSave(id);
+    }
+  });
+
+  saveSelect.addEventListener("change", () => refreshSaveUI(saveSelect.value));
 }
 
+// ---------- Boot ----------
 (function boot() {
   wireUi();
+  refreshSaveUI();
   logLine("You wake with a mouth full of ash and a plan you do not remember making.", "Start");
   renderAll();
 })();
