@@ -16,6 +16,25 @@
         <button id="btnLoad" type="button">Load</button>
         <button id="btnNew" type="button">New Game</button>
       </div>
+<section class="savePanel">
+  <div class="saveRow">
+    <label class="saveLabel" for="saveName">Save name</label>
+    <input id="saveName" class="saveInput" type="text" placeholder="e.g., Ridge run / Mage / Attempt 3" />
+    <button id="btnSaveNew" type="button">Save New</button>
+  </div>
+
+  <div class="saveRow">
+    <label class="saveLabel" for="saveSelect">Saves</label>
+    <select id="saveSelect" class="saveSelect"></select>
+    <button id="btnSaveOverwrite" type="button">Overwrite</button>
+    <button id="btnLoadSelected" type="button">Load</button>
+    <button id="btnDeleteSelected" type="button" class="danger">Delete</button>
+  </div>
+
+  <p class="saveHint" id="saveHint"></p>
+</section>
+
+      
     </header>
 
     <!-- Description ABOVE buttons (your preferred layout) -->
