@@ -543,6 +543,21 @@ function renderAll() {
 }
 
 function wireUi() {
+  document.getElementById("pick_wanderer").addEventListener("click", () => {
+  startNewGameWithClass("wanderer");
+  closeIntroOverlay();
+});
+
+document.getElementById("pick_scrapper").addEventListener("click", () => {
+  startNewGameWithClass("scrapper");
+  closeIntroOverlay();
+});
+
+document.getElementById("pick_scout").addEventListener("click", () => {
+  startNewGameWithClass("scout");
+  closeIntroOverlay();
+});
+
   // New game opens the intro/class menu
   document.getElementById("btnNew").addEventListener("click", openIntroOverlay);
   document.getElementById("btnIntroCancel").addEventListener("click", closeIntroOverlay);
