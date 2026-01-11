@@ -4,10 +4,41 @@
 const STORAGE_INDEX_KEY = "textRpgSavesIndex_v1";
 const STORAGE_SAVE_PREFIX = "textRpgSave_v1__";
 
+// Starter classes
+const CLASSES = {
+  wanderer: {
+    id: "wanderer",
+    name: "Wanderer",
+    blurb: "Balanced and stubborn. Good at surviving bad plans.",
+    maxHp: 10,
+    maxStamina: 6,
+    startingItems: { stick: 1, fiber: 1 }
+  },
+  scrapper: {
+    id: "scrapper",
+    name: "Scrapper",
+    blurb: "A pocket full of junk and a head full of angles.",
+    maxHp: 9,
+    maxStamina: 7,
+    startingItems: { scrap: 2, fiber: 1 }
+  },
+  scout: {
+    id: "scout",
+    name: "Scout",
+    blurb: "Fast feet, sharp eyes. The road is a puzzle you solve by moving.",
+    maxHp: 8,
+    maxStamina: 8,
+    startingItems: { fiber: 2, stone: 1, stick: 1 }
+  }
+};
+
 // Game state
 const state = {
   time: 0,
   locationId: WORLD.startLocationId,
+  playerClassId: null,
+  maxHp: 10,
+  maxStamina: 6,
   hp: 10,
   stamina: 6,
   hunger: 0,
@@ -56,8 +87,70 @@ function escapeHtml(str) {
 function logLine(text, tag = "") {
   const entry = { text, tag, t: Date.now() };
   state.log.unshift(entry);
-  if (state.log.length > 60) state.log.pop();
+  if (state.log.length > 80) state.log.pop();
   renderLog();
+}
+
+// ---------- Intro / Class Pick ----------
+function openIntroOverlay() {
+  const overlay = document.getElementById("introOverlay");
+  const grid = document.getElementById("classGrid");
+  const hint = document.getElementById("classHint");
+
+  grid.innerHTML = "";
+  hint.textContent = "Tip: Pick a class to begin. You can save multiple runs later.";
+
+  for (const cls of Object.values(CLASSES)) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "classBtn";
+    btn.innerHTML = `
+      <span class="className">${escapeHtml(cls.name)}</span>
+      <span class="classMeta">
+        ${escapeHtml(cls.blurb)}<br>
+        HP ${cls.maxHp} | Stamina ${cls.maxStamina}<br>
+        Start: ${escapeHtml(formatItemsInline(cls.startingItems))}
+      </span>
+    `;
+    btn.addEventListener("click", () => {
+      startNewGameWithClass(cls.id);
+      closeIntroOverlay();
+    });
+    grid.appendChild(btn);
+  }
+
+  overlay.classList.remove("hidden");
+  overlay.setAttribute("aria-hidden", "false");
+}
+
+function closeIntroOverlay() {
+  const overlay = document.getElementById("introOverlay");
+  overlay.classList.add("hidden");
+  overlay.setAttribute("aria-hidden", "true");
+}
+
+function formatItemsInline(itemsObj) {
+  const parts = [];
+  for (const [id, qty] of Object.entries(itemsObj || {})) {
+    const name = WORLD.items[id]?.name || id;
+    parts.push(`${name} x${qty}`);
+  }
+  return parts.length ? parts.join(", ") : "Nothing";
+}
+
+function applyClass(classId) {
+  const cls = CLASSES[classId];
+  if (!cls) return;
+
+  state.playerClassId = cls.id;
+  state.maxHp = cls.maxHp;
+  state.maxStamina = cls.maxStamina;
+  state.hp = cls.maxHp;
+  state.stamina = cls.maxStamina;
+
+  for (const [id, qty] of Object.entries(cls.startingItems)) {
+    addItem(id, qty);
+  }
 }
 
 // ---------- Core Loop ----------
@@ -65,13 +158,16 @@ function tick() {
   state.time += 1;
   state.hunger += 1;
 
+  // Pressure system
   if (state.hunger >= 6) {
     state.hp = Math.max(0, state.hp - 1);
     logLine("Hunger gnaws. You lose 1 HP.", "Status");
     state.hunger = 5;
   }
 
-  state.stamina = Math.min(6, state.stamina + 1);
+  // Stamina regen
+  state.stamina = Math.min(state.maxStamina, state.stamina + 1);
+
   renderHud();
 }
 
@@ -96,12 +192,14 @@ function describeInventory() {
 // ---------- Render ----------
 function renderHud() {
   const hud = document.getElementById("hud");
+  const clsName = state.playerClassId ? (CLASSES[state.playerClassId]?.name || state.playerClassId) : "None";
   hud.innerHTML = `
-    <span class="tag">HP: ${state.hp}</span>
-    <span class="tag">Stamina: ${state.stamina}</span>
+    <span class="tag">Class: ${escapeHtml(clsName)}</span>
+    <span class="tag">HP: ${state.hp}/${state.maxHp}</span>
+    <span class="tag">Stamina: ${state.stamina}/${state.maxStamina}</span>
     <span class="tag">Hunger: ${state.hunger}</span>
     <span class="tag">Time: ${state.time}</span>
-    <span class="tag">Inventory: ${describeInventory()}</span>
+    <span class="tag">Inventory: ${escapeHtml(describeInventory())}</span>
   `;
 }
 
@@ -111,7 +209,7 @@ function renderLog() {
   for (const e of state.log) {
     const div = document.createElement("div");
     div.className = "logLine";
-    div.innerHTML = `${e.tag ? `<span class="tag">${e.tag}</span>` : ""}${escapeHtml(e.text)}`;
+    div.innerHTML = `${e.tag ? `<span class="tag">${escapeHtml(e.tag)}</span>` : ""}${escapeHtml(e.text)}`;
     logEl.appendChild(div);
   }
 }
@@ -196,8 +294,8 @@ function doAction(actionId) {
   }
 
   if (actionId === "rest") {
-    state.hp = Math.min(10, state.hp + 2);
-    state.stamina = Math.min(6, state.stamina + 3);
+    state.hp = Math.min(state.maxHp, state.hp + 2);
+    state.stamina = Math.min(state.maxStamina, state.stamina + 3);
     state.hunger = Math.min(5, state.hunger + 1);
     logLine("You rest. Your breath steadies.", "Rest");
     tick();
@@ -273,6 +371,7 @@ function setSavesIndex(index) {
 
 function summarizeStateForIndex(label, id, createdAt, updatedAt) {
   const loc = WORLD.locations[state.locationId];
+  const clsName = state.playerClassId ? (CLASSES[state.playerClassId]?.name || state.playerClassId) : "None";
   return {
     id,
     label: label || "Unnamed run",
@@ -280,6 +379,7 @@ function summarizeStateForIndex(label, id, createdAt, updatedAt) {
     updatedAt,
     locationId: state.locationId,
     locationTitle: loc?.title || state.locationId,
+    className: clsName,
     hp: state.hp,
     stamina: state.stamina,
     hunger: state.hunger,
@@ -366,7 +466,8 @@ function deleteSave(id) {
 function formatSaveOption(s) {
   const dt = new Date(s.updatedAt);
   const when = isNaN(dt.getTime()) ? "unknown date" : dt.toLocaleString();
-  return `${s.label} | ${when} | ${s.locationTitle} | t:${s.time} HP:${s.hp}`;
+  const cls = s.className ? ` | ${s.className}` : "";
+  return `${s.label}${cls} | ${when} | ${s.locationTitle} | t:${s.time} HP:${s.hp}`;
 }
 
 function refreshSaveUI(selectId = null) {
@@ -401,24 +502,33 @@ function refreshSaveUI(selectId = null) {
     if (selected) {
       const created = new Date(selected.createdAt);
       const cStr = isNaN(created.getTime()) ? "unknown" : created.toLocaleString();
-      hint.textContent = `Selected: "${selected.label}" (created ${cStr}).`;
+      hint.textContent = `Selected: "${selected.label}" (${selected.className || "None"}) (created ${cStr}).`;
     } else {
       hint.textContent = "";
     }
   }
 }
 
-// ---------- New Game + Wiring ----------
-function newGame() {
+// ---------- New Game Flow ----------
+function startNewGameWithClass(classId) {
+  // Reset
   state.time = 0;
   state.locationId = WORLD.startLocationId;
-  state.hp = 10;
-  state.stamina = 6;
   state.hunger = 0;
   state.inventory = {};
   state.flags = {};
   state.log = [];
-  logLine("New game started.", "System");
+
+  // Apply class
+  applyClass(classId);
+
+  // Intro sequence lines
+  logLine("A cold wind worries the edges of your thoughts.", "Intro");
+  logLine("Somewhere behind you, a past you refuse to carry.", "Intro");
+  logLine(`You are a ${CLASSES[classId].name}.`, "Class");
+  logLine(`Start gear: ${formatItemsInline(CLASSES[classId].startingItems)}.`, "Class");
+  logLine("The road waits. It does not blink.", "Intro");
+
   renderAll();
   refreshSaveUI(document.getElementById("saveSelect")?.value || null);
 }
@@ -430,7 +540,9 @@ function renderAll() {
 }
 
 function wireUi() {
-  document.getElementById("btnNew").addEventListener("click", newGame);
+  // New game opens the intro/class menu
+  document.getElementById("btnNew").addEventListener("click", openIntroOverlay);
+  document.getElementById("btnIntroCancel").addEventListener("click", closeIntroOverlay);
 
   const saveName = document.getElementById("saveName");
   const saveSelect = document.getElementById("saveSelect");
@@ -466,6 +578,6 @@ function wireUi() {
 (function boot() {
   wireUi();
   refreshSaveUI();
-  logLine("You wake with a mouth full of ash and a plan you do not remember making.", "Start");
+  logLine("Press New Game to begin.", "System");
   renderAll();
 })();
