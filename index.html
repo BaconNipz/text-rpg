@@ -1,4 +1,3 @@
-<!-- index.html -->
 <!doctype html>
 <html lang="en">
 <head>
@@ -44,6 +43,26 @@
         <p class="saveHint" id="saveHint"></p>
       </section>
     </header>
+
+    <!-- INTRO / CLASS PICK OVERLAY -->
+    <div id="introOverlay" class="overlay hidden" aria-hidden="true">
+      <div class="overlayCard">
+        <h2 id="introTitle">New Game</h2>
+        <p id="introText" class="desc">
+          The night tastes like ash. Your pockets are light. The world is heavy.
+          <br><br>
+          Choose who you are before the road chooses for you.
+        </p>
+
+        <div class="classGrid" id="classGrid"></div>
+
+        <div class="overlayActions">
+          <button id="btnIntroCancel" type="button" class="danger">Cancel</button>
+        </div>
+
+        <p class="saveHint" id="classHint"></p>
+      </div>
+    </div>
 
     <!-- Description ABOVE buttons -->
     <section class="panel">
