@@ -94,8 +94,11 @@ function logLine(text, tag = "") {
 // ---------- Intro / Class Pick ----------
 function openIntroOverlay() {
   const overlay = document.getElementById("introOverlay");
-  const grid = document.getElementById("classGrid");
   const hint = document.getElementById("classHint");
+  if (hint) hint.textContent = "Pick a class to begin.";
+  overlay.classList.remove("hidden");
+  overlay.setAttribute("aria-hidden", "false");
+}
 
   grid.innerHTML = "";
   hint.textContent = "Tip: Pick a class to begin. You can save multiple runs later.";
